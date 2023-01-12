@@ -487,6 +487,11 @@ private:
     }
   }
 
+  static uint32_t exec_us_thresh;
+  static uint32_t input_len_bytes_thresh;
+  static bool use_smaller_faster = true;
+  static bool inited_seed_split = false;
+
   // Updates the probability distribution for the units in the corpus.
   // Must be called whenever the corpus or unit weights are changed.
   //
@@ -544,13 +549,42 @@ private:
       }
     }
 
+    if (!inited_seed_split) {
+            auto maybe = std::env("EXEC_US_THRESH");
+            if (maybe == nullptr) {
+                exec_us_thresh = 200;
+            } else {
+                exec_us_thresh = std::stoi(maybe);
+            }
+
+            auto maybe = std::env("INPUT_BYTES_THRESH");
+            if (maybe == nullptr) {
+                input_len_bytes_thresh = 500;
+            } else {
+                input_len_bytes_thresh = std::stoi(maybe);
+            }
+
+            auto maybe = std::env("USE_FASTER_SMALLER");
+            if (maybe == nullptr) {
+                use_smaller_faster = true;
+            } else {
+                use_smaller_faster = std::stoi(maybe);
+            }
+    }
+
     if (VanillaSchedule) {
       for (size_t i = 0; i < N; i++)
-        Weights[i] =
-            Inputs[i]->NumFeatures
-                ? static_cast<double>((i + 1) *
-                                      (Inputs[i]->HasFocusFunction ? 1000 : 1))
-                : 0.;
+        if (use_smaller_faster && (Inputs[i]->U.size() > input_len_bytes_thresh || Inputs[i]->TimeOfUnit > exec_us_thresh) {
+            Weights[i] = 0;
+        } else if (!use_smaller_faster && (Inputs[i]->U.size() < input_len_bytes_thresh && Inputs[i]->TimeOfUnit < exec_us_thresh) {
+            Weights[i] = 0;
+        } else {
+            Weights[i] =
+                    Inputs[i]->NumFeatures
+                        ? static_cast<double>((i + 1) *
+                                              (Inputs[i]->HasFocusFunction ? 1000 : 1))
+                        : 0.;
+        }
     }
 
     if (FeatureDebug) {
