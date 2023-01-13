@@ -25,6 +25,12 @@
 #include <unordered_set>
 
 namespace fuzzer {
+static uint32_t exec_us_thresh;
+static uint32_t input_len_bytes_thresh;
+
+// default zero inited to false
+static bool use_larger_or_slower;
+static bool inited_seed_split;
 
 struct InputInfo {
   Unit U; // The actual input data.
@@ -157,7 +163,6 @@ class InputCorpus {
   static const uint32_t kFeatureSetSize = 1 << 21;
   static const uint8_t kMaxMutationFactor = 20;
   static const size_t kSparseEnergyUpdates = 100;
-
   size_t NumExecutedMutations = 0;
 
   EntropicOptions Entropic;
@@ -490,11 +495,6 @@ private:
     }
   }
 
-  static uint32_t exec_us_thresh;
-  static uint32_t input_len_bytes_thresh;
-  static bool use_smaller_faster = true;
-  static bool inited_seed_split = false;
-
   // Updates the probability distribution for the units in the corpus.
   // Must be called whenever the corpus or unit weights are changed.
   //
@@ -553,33 +553,39 @@ private:
     }
 
     if (!inited_seed_split) {
-      auto maybe = std::getenv("EXEC_US_THRESH");
-      if (maybe == nullptr) {
+      auto maybe_us = std::getenv("EXEC_US_THRESH");
+      if (maybe_us == nullptr) {
         exec_us_thresh = 200;
       } else {
-        exec_us_thresh = std::stoi(maybe);
+        exec_us_thresh = std::stoi(maybe_us);
       }
 
-      auto maybe = std::getenv("INPUT_BYTES_THRESH");
-      if (maybe == nullptr) {
+      auto maybe_bytes = std::getenv("INPUT_BYTES_THRESH");
+      if (maybe_bytes == nullptr) {
         input_len_bytes_thresh = 500;
       } else {
-        input_len_bytes_thresh = std::stoi(maybe);
+        input_len_bytes_thresh = std::stoi(maybe_bytes);
       }
 
       auto maybe = std::getenv("USE_FASTER_SMALLER");
       if (maybe == nullptr) {
-        use_smaller_faster = true;
+        use_larger_or_slower = false;
       } else {
-        use_smaller_faster = std::stoi(maybe);
+        use_larger_or_slower = !std::stoi(maybe);
       }
     }
 
     if (VanillaSchedule) {
       for (size_t i = 0; i < N; i++)
-        if (use_smaller_faster && (Inputs[i]->U.size() > input_len_bytes_thresh || Inputs[i]->TimeOfUnit > exec_us_thresh) {
+        if (!use_larger_or_slower &&
+            (Inputs[i]->U.size() > input_len_bytes_thresh ||
+             Inputs[i]->TimeOfUnit >
+                 (std::chrono::microseconds)exec_us_thresh)) {
           Weights[i] = 0;
-        } else if (!use_smaller_faster && (Inputs[i]->U.size() < input_len_bytes_thresh && Inputs[i]->TimeOfUnit < exec_us_thresh) {
+        } else if (use_larger_or_slower &&
+                   (Inputs[i]->U.size() < input_len_bytes_thresh &&
+                    Inputs[i]->TimeOfUnit <
+                        (std::chrono::microseconds)exec_us_thresh)) {
           Weights[i] = 0;
         } else {
           Weights[i] =
