@@ -19,6 +19,7 @@
 #include "FuzzerTracePC.h"
 #include <algorithm>
 #include <chrono>
+#include <cstdlib>
 #include <numeric>
 #include <random>
 #include <unordered_set>
@@ -26,9 +27,9 @@
 namespace fuzzer {
 
 struct InputInfo {
-  Unit U;  // The actual input data.
+  Unit U; // The actual input data.
   std::chrono::microseconds TimeOfUnit;
-  uint8_t Sha1[kSHA1NumBytes];  // Checksum.
+  uint8_t Sha1[kSHA1NumBytes]; // Checksum.
   // Number of features that this input has and no smaller input has.
   size_t NumFeatures = 0;
   size_t Tmp = 0; // Used by ValidateFeatureSet.
@@ -187,7 +188,7 @@ public:
   size_t MaxInputSize() const {
     size_t Res = 0;
     for (auto II : Inputs)
-        Res = std::max(Res, II->U.size());
+      Res = std::max(Res, II->U.size());
     return Res;
   }
   void IncrementNumExecutedMutations() { NumExecutedMutations++; }
@@ -205,7 +206,7 @@ public:
   }
 
   bool empty() const { return Inputs.empty(); }
-  const Unit &operator[] (size_t Idx) const { return Inputs[Idx]->U; }
+  const Unit &operator[](size_t Idx) const { return Inputs[Idx]->U; }
   InputInfo *AddToCorpus(const Unit &U, size_t NumFeatures, bool MayDeleteFile,
                          bool HasFocusFunction, bool NeverReduce,
                          std::chrono::microseconds TimeOfUnit,
@@ -249,7 +250,8 @@ public:
 
   // Debug-only
   void PrintUnit(const Unit &U) {
-    if (!FeatureDebug) return;
+    if (!FeatureDebug)
+      return;
     for (uint8_t C : U) {
       if (C != 'F' && C != 'U' && C != 'Z')
         C = '.';
@@ -259,16 +261,18 @@ public:
 
   // Debug-only
   void PrintFeatureSet(const std::vector<uint32_t> &FeatureSet) {
-    if (!FeatureDebug) return;
+    if (!FeatureDebug)
+      return;
     Printf("{");
-    for (uint32_t Feature: FeatureSet)
+    for (uint32_t Feature : FeatureSet)
       Printf("%u,", Feature);
     Printf("}");
   }
 
   // Debug-only
   void PrintCorpus() {
-    if (!FeatureDebug) return;
+    if (!FeatureDebug)
+      return;
     Printf("======= CORPUS:\n");
     int i = 0;
     for (auto II : Inputs) {
@@ -334,7 +338,7 @@ public:
 
   void PrintFeatureSet() {
     for (size_t i = 0; i < kFeatureSetSize; i++) {
-      if(size_t Sz = GetFeature(i))
+      if (size_t Sz = GetFeature(i))
         Printf("[%zd: id %zd sz%zd] ", i, SmallestElementPerFeature[i], Sz);
     }
     Printf("\n\t");
@@ -468,7 +472,6 @@ public:
   size_t NumFeatureUpdates() const { return NumUpdatedFeatures; }
 
 private:
-
   static const bool FeatureDebug = false;
 
   uint32_t GetFeature(size_t Idx) const { return InputSizesPerFeature[Idx]; }
@@ -479,7 +482,7 @@ private:
     for (size_t Idx = 0; Idx < kFeatureSetSize; Idx++)
       if (GetFeature(Idx))
         Inputs[SmallestElementPerFeature[Idx]]->Tmp++;
-    for (auto II: Inputs) {
+    for (auto II : Inputs) {
       if (II->Tmp != II->NumFeatures)
         Printf("ZZZ %zd %zd\n", II->Tmp, II->NumFeatures);
       assert(II->Tmp == II->NumFeatures);
@@ -550,40 +553,40 @@ private:
     }
 
     if (!inited_seed_split) {
-            auto maybe = std::env("EXEC_US_THRESH");
-            if (maybe == nullptr) {
-                exec_us_thresh = 200;
-            } else {
-                exec_us_thresh = std::stoi(maybe);
-            }
+      auto maybe = std::getenv("EXEC_US_THRESH");
+      if (maybe == nullptr) {
+        exec_us_thresh = 200;
+      } else {
+        exec_us_thresh = std::stoi(maybe);
+      }
 
-            auto maybe = std::env("INPUT_BYTES_THRESH");
-            if (maybe == nullptr) {
-                input_len_bytes_thresh = 500;
-            } else {
-                input_len_bytes_thresh = std::stoi(maybe);
-            }
+      auto maybe = std::getenv("INPUT_BYTES_THRESH");
+      if (maybe == nullptr) {
+        input_len_bytes_thresh = 500;
+      } else {
+        input_len_bytes_thresh = std::stoi(maybe);
+      }
 
-            auto maybe = std::env("USE_FASTER_SMALLER");
-            if (maybe == nullptr) {
-                use_smaller_faster = true;
-            } else {
-                use_smaller_faster = std::stoi(maybe);
-            }
+      auto maybe = std::getenv("USE_FASTER_SMALLER");
+      if (maybe == nullptr) {
+        use_smaller_faster = true;
+      } else {
+        use_smaller_faster = std::stoi(maybe);
+      }
     }
 
     if (VanillaSchedule) {
       for (size_t i = 0; i < N; i++)
         if (use_smaller_faster && (Inputs[i]->U.size() > input_len_bytes_thresh || Inputs[i]->TimeOfUnit > exec_us_thresh) {
-            Weights[i] = 0;
+          Weights[i] = 0;
         } else if (!use_smaller_faster && (Inputs[i]->U.size() < input_len_bytes_thresh && Inputs[i]->TimeOfUnit < exec_us_thresh) {
-            Weights[i] = 0;
+          Weights[i] = 0;
         } else {
-            Weights[i] =
-                    Inputs[i]->NumFeatures
-                        ? static_cast<double>((i + 1) *
-                                              (Inputs[i]->HasFocusFunction ? 1000 : 1))
-                        : 0.;
+          Weights[i] =
+              Inputs[i]->NumFeatures
+                  ? static_cast<double>(
+                        (i + 1) * (Inputs[i]->HasFocusFunction ? 1000 : 1))
+                  : 0.;
         }
     }
 
@@ -619,6 +622,6 @@ private:
   std::string OutputCorpus;
 };
 
-}  // namespace fuzzer
+} // namespace fuzzer
 
-#endif  // LLVM_FUZZER_CORPUS
+#endif // LLVM_FUZZER_CORPUS
